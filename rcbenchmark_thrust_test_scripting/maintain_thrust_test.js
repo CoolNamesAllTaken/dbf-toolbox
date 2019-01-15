@@ -33,16 +33,34 @@ var THRUST_PERCENT_MARGIN = 0.25;
  */
 var OUTPUT_PERIOD_US_DELTA = 25;
 
+/* When the PWM output changes to change the propeller speed,
+ * it takes a bit of time from when the PWM output is changed
+ * to when the thrust actually changes. This variable represents
+ * the time to take between changing the PWM output and the next
+ * reading of the thrust.
+ */ 
+var THRUST_CHANGE_SETTLING_TIME_SECONDS = 3;
+
+/* This denotes how long to maintain the target thrust range.
+ */
+var TIME_TO_MAINTAIN_TARGET_THRUST_SECONDS = 15;
+
 /* These are global variables which are expected to be read and
  * set throughout program execution.
  * 
  *   curThrust : the most recently read thrust measurement(in kgf)
  *   curOutputPeriod : the most recently PWM period output to
  *       the ESC in microseconds
+ *   timeThrustMaintainedSeconds : The amount of time the target
+ *       thrust has been maintained so far. It seems that RCBenchmark
+ *       has no way to measure actual time, so the time measurement
+ *       will be approximations based on
+ *       THRUST_CHANGE_SETTLING_TIME_SECONDS * (num times thrust
+ *              measured and set)
  */
 var curThrust = 99999;
 var curOutputPeriod = OUTPUT_PERIOD_US_MIN;
-
+var timeThrustMaintainedSeconds = 0;
 
 
 
@@ -73,9 +91,7 @@ function initializeTest() {
     rcb.console.setVerbose(true);
     rcb.sensors.read(readAndUpdateThrust,10); // Read and average 10 samples
 
-        rcb.console.print("4444");
-    rcb.wait(loopTest, 1); // Wait 1 second then start the main loop/body of the test
-        rcb.console.print("5555");
+    rcb.wait(maintainThrust, 1); // Wait 1 second then start the main loop/body of the test
 }
 
 function readAndUpdateThrust(result){
@@ -102,7 +118,7 @@ function setOutputPeriod(period) {
 
 
 
-function loopTest() {
+function maintainThrust() {
     rcb.console.print("Top of loop!");
 
     rcb.sensors.read(readAndUpdateThrust,10); // Read and average 10 samples
@@ -116,13 +132,20 @@ function loopTest() {
     if(curThrust < lowerBound) {
         rcb.console.print("curThrust < " + lowerBound + ". Increasing output.");
         setOutputPeriod(curOutputPeriod + OUTPUT_PERIOD_US_DELTA);
-    } else if(curThrust > THRUST_TARGET_KGF*(1.0+THRUST_PERCENT_MARGIN/2.0)) {
+    } else if(curThrust > upperBound) {
         rcb.console.print("curThrust > " + upperBound + ". Decreasing output");
         setOutputPeriod(curOutputPeriod - OUTPUT_PERIOD_US_DELTA);
+    } else { // Thrust in target range.
+        timeThrustMaintainedSeconds += THRUST_CHANGE_SETTLING_TIME_SECONDS;
     }
 
     rcb.console.print("=================================");
 
-    rcb.wait(loopTest, 3);    
+    if(timeThrustMaintainedSeconds >= TIME_TO_MAINTAIN_TARGET_THRUST_SECONDS) {
+        rcb.console.print("Target thrust range met for at least " + TIME_TO_MAINTAIN_TARGET_THRUST_SECONDS + " seconds.");
+        earlyExit();
+    }
+
+    rcb.wait(maintainThrust, THRUST_CHANGE_SETTLING_TIME_SECONDS);    
 }
 
