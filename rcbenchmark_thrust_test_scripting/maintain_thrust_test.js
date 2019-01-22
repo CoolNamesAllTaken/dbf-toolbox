@@ -19,13 +19,15 @@ var THRUST_TARGET_KGF = 2.2;
  * propeller power would only decrease when thrust > 1.125.
  * Note that 1.125 - 0.875 = 0.25.
  */
-var THRUST_PERCENT_MARGIN = 0.25;
+var THRUST_PERCENT_MARGIN = 0.10;
+
 /* If thrust is too large or too small, the ESC output period
  * will be changed by this much. If this value is small, it may
  * take a long time to reach your desired thrust. If this value
  * is too large, the thrust may just oscillate above and below
  * your target range, never falling within it.
  */
+
 var OUTPUT_PERIOD_US_DELTA = 25;
 /* When the PWM output changes to change the propeller speed,
  * it takes a bit of time from when the PWM output is changed
@@ -37,6 +39,13 @@ var THRUST_CHANGE_SETTLING_TIME_SECONDS = 3;
 /* This denotes how long to maintain the target thrust range.
  */
 var TIME_TO_MAINTAIN_TARGET_THRUST_SECONDS = 60;
+
+/* Time spent in simulated takeoff. The test will run max thrust
+ * during this period, and then maintain the target thrust defined
+ * above.
+ */
+var TAKEOFF_TIME_SECONDS = 20;
+
 /* These are global variables which are expected to be read and
  * set throughout program execution.
  * 
@@ -53,6 +62,7 @@ var TIME_TO_MAINTAIN_TARGET_THRUST_SECONDS = 60;
 var curThrust = 99999;
 var curOutputPeriod = OUTPUT_PERIOD_US_MIN;
 var timeThrustMaintainedSeconds = 0;
+var timeSpentInTakefoff = 0;
 // ==================================================================
 // ==================================================================
 // ========================= CODE STARTS! ===========================
@@ -97,9 +107,9 @@ function setOutputPeriod(period) {
 }
 function maintainThrust() {
     rcb.console.print("Top of loop!");
-    if (timeThrustMaintainedSeconds < 20){
-        setOutputPeriod(2300);
-        timeThrustMaintainedSeconds += THRUST_CHANGE_SETTLING_TIME_SECONDS;
+    if (timeSpentInTakefoff < 20){
+        setOutputPeriod(OUTPUT_PERIOD_US_MAX);
+        timeSpentInTakefoff += THRUST_CHANGE_SETTLING_TIME_SECONDS;
     } else {
         rcb.sensors.read(readAndUpdateThrust,10); // Read and average 10 samples
         rcb.console.print("curThrust = " + curThrust);
