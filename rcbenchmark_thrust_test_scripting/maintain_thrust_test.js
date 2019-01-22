@@ -11,9 +11,11 @@ var OUTPUT_PERIOD_US_MAX = 2300;
  * the name of the log file.
  */
 var filePrefix = "CustTest";
+
 /* The target thrust to maintain in kgf.
  */
 var THRUST_TARGET_KGF = 2.2;
+
 /* The percent error that is acceptable in thrust. For example,
  * if THRUST_TARGET_KGF = 1, and THRUST_PERCENT_MARGIN = 0.25,
  * then propeller power would increase when thrust < 0.875 AND
@@ -28,8 +30,8 @@ var THRUST_PERCENT_MARGIN = 0.10;
  * is too large, the thrust may just oscillate above and below
  * your target range, never falling within it.
  */
-
 var OUTPUT_PERIOD_US_DELTA = 25;
+
 /* When the PWM output changes to change the propeller speed,
  * it takes a bit of time from when the PWM output is changed
  * to when the thrust actually changes. This variable represents
@@ -37,17 +39,24 @@ var OUTPUT_PERIOD_US_DELTA = 25;
  * reading of the thrust.
  */ 
 var THRUST_CHANGE_SETTLING_TIME_SECONDS = 3;
-/* This denotes how long to maintain the target thrust range.
+
+/* This code will warm first enter a "warm-up" phase to get current
+ * flowing. This will be a relatively small thrust. After this, a
+ * takeoff will be simulated, during which maximum thrust will be
+ * specified. After this, the system will feed back and calibrate 
+ * in order to output a constant thrust.
+ *
+ * The following three constants define how long each of these phases
+ * should last.
  */
+var WARMUP_TIME_SECONDS = 10;
+var TAKEOFF_TIME_SECONDS = 20;
 var TIME_TO_MAINTAIN_TARGET_THRUST_SECONDS = 60;
 
-/* Time spent in simulated takeoff. The test will run max thrust
- * during this period, and then maintain the target thrust defined
- * above.
- */
-var TAKEOFF_TIME_SECONDS = 20;
 
-var WARMUP_TIME_SECONDS = 10;
+// Constants above ^^
+// Variables below vv
+
 
 /* These are global variables which are expected to be read and
  * set throughout program execution.
@@ -67,6 +76,8 @@ var curOutputPeriod = OUTPUT_PERIOD_US_MIN;
 var timeThrustMaintainedSeconds = 0;
 var timeSpentInTakefoff = 0;
 var timeSpentWarmingUp = 0;
+
+
 // ==================================================================
 // ==================================================================
 // ========================= CODE STARTS! ===========================
@@ -79,16 +90,20 @@ rcb.console.print("Initializing ESC!");
 curOutputPeriod = OUTPUT_PERIOD_US_MIN;
 rcb.output.pwm("esc", OUTPUT_PERIOD_US_MIN); // <-- 1000 is baseline
 rcb.wait(initializeTest, 4); // Wait 4 seconds, then callback to initializeTest
+
+
 function earlyExit() {
     rcb.console.print("EXITING EARLY");
     rcb.endScript();
 }
+
 function initializeTest() {
     rcb.console.print("Taking initial thrust measurement");
     rcb.console.setVerbose(true);
     rcb.sensors.read(readAndUpdateThrust,10); // Read and average 10 samples
     rcb.wait(maintainThrust, 1); // Wait 1 second then start the main loop/body of the test
 }
+
 function readAndUpdateThrust(result){
     var thrust = result.thrust.displayValue;
     var unit = result.thrust.displayUnit;
@@ -99,6 +114,7 @@ function readAndUpdateThrust(result){
     curThrust = thrust.toPrecision(5);
     rcb.console.print("Thrust: " + thrust.toPrecision(3) + " " + unit);
 }
+
 function setOutputPeriod(period) {
     if(period > OUTPUT_PERIOD_US_MAX) {
         period = OUTPUT_PERIOD_US_MAX;
