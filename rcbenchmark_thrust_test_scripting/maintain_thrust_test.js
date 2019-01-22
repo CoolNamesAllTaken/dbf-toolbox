@@ -6,6 +6,7 @@
  */
 var OUTPUT_PERIOD_US_MIN = 1000;
 var OUTPUT_PERIOD_US_MAX = 2300;
+
 /* When a log file is output, this will be the prefix of
  * the name of the log file.
  */
@@ -46,6 +47,8 @@ var TIME_TO_MAINTAIN_TARGET_THRUST_SECONDS = 60;
  */
 var TAKEOFF_TIME_SECONDS = 20;
 
+var WARMUP_TIME_SECONDS = 10;
+
 /* These are global variables which are expected to be read and
  * set throughout program execution.
  * 
@@ -63,6 +66,7 @@ var curThrust = 99999;
 var curOutputPeriod = OUTPUT_PERIOD_US_MIN;
 var timeThrustMaintainedSeconds = 0;
 var timeSpentInTakefoff = 0;
+var timeSpentWarmingUp = 0;
 // ==================================================================
 // ==================================================================
 // ========================= CODE STARTS! ===========================
@@ -107,9 +111,14 @@ function setOutputPeriod(period) {
 }
 function maintainThrust() {
     rcb.console.print("Top of loop!");
-    if (timeSpentInTakefoff < 20){
+    if (timeSpentWarmingUp < WARMUP_TIME_SECONDS) {
+        setOutputPeriod(1200);
+        timeSpentWarmingUp += THRUST_CHANGE_SETTLING_TIME_SECONDS;
+
+    } else if (timeSpentInTakefoff < TAKEOFF_TIME_SECONDS){
         setOutputPeriod(OUTPUT_PERIOD_US_MAX);
         timeSpentInTakefoff += THRUST_CHANGE_SETTLING_TIME_SECONDS;
+
     } else {
         rcb.sensors.read(readAndUpdateThrust,10); // Read and average 10 samples
         rcb.console.print("curThrust = " + curThrust);
